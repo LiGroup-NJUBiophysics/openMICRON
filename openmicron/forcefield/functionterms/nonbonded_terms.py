@@ -2,59 +2,6 @@ import openmm as mm
 from openmm import unit
 import numpy as np
 
-def oriented_dependent_Hbond_term(odHbond_info,use_pbc=False,cutoff=2.5,force_group=1):
-    """a orientation dependent Lenard-Jones type potential for hydrogen bonds
-
-    Parameters
-    ----------
-    odHbond_info: pd.DataFrame
-        Information for all native hydrogen bonds are expressed as a N*Nine tabel.
-        N row are represent the amount of Hbond. 9 columns are index of a1(atom1), 
-        a2, a3, a4, a5, a6 and epsilon, sigma, cutoff(truncation distance/sigma), respectively
-
-    use_pbc: bool, optional
-        Whether use periodic boundary conditions.  If False (default), then pbc would not apply to force.
-
-    cutoff: float
-        cutoff = truncation distance / rest length. If cutoff is None, the potential will not be trancated.
-
-    force_group: int
-        Force group.
-    
-    Return
-    ------
-    oriented_dependent_Hbond_force: Force
-        OpenMM Force object
-    """
-    '''
-        step(r-sigma)*LJ*A+(1-delta(sigma-r))*step(sigma-r)*(LJ+(1-A)*epsilon);
-                                              LJ=epsilon*(5*(sigma/r)^12-6*(sigma/r)^10);
-    '''
-    # energy function of Hbond
-    energy_func = f"""step(r-sigma)*LJ*A+(1-delta(sigma-r))*step(sigma-r)*(LJ+(1-A)*epsilon);
-                                              LJ=epsilon*(5*(sigma/r)^12-6*(sigma/r)^10);
-                                              r=distance(p7,p8);
-                                              A=(1/(1+10*sin(theta1)^4)+1/(1+10*sin(theta2)^4))/2;  
-                                              theta1=pointangle(cx1,cy1,cz1,x2,y2,z2,x5,y5,z5);
-                                              theta2=pointangle(cx2,cy2,cz2,x5,y5,z5,x2,y2,z2);
-                                              cx1=px1+x2;cy1=py1+y2;cz1=pz1+z2;
-                                              cx2=px2+x5;cy2=py2+y5;cz2=pz1+z5;
-                                              px1=(d1y*d2z-d1z*d2y);py1=(d1z*d2x-d1x*d2z);pz1=(d1x*d2y-d1y*d2x);
-                                              px2=(d3y*d4z-d3z*d4y);py2=(d3z*d4x-d3x*d4z);pz2=(d3x*d4y-d3y*d4x);
-                                              d1x=x1-x2;d1y=y1-y2;d1z=z1-z2;d2x=x3-x2;d2y=y3-y2;d2z=z3-z2;
-                                              d3x=x4-x5;d3y=y4-y5;d3z=z4-z5;d4x=x6-x5;d4y=y6-y5;d4z=z6-z5;"""
-    if cutoff != None:
-        energy_func = f"""step({cutoff}*sigma - r)*""" + energy_func
-
-    oriented_dependent_Hbond_force = mm.CustomCompoundBondForce(8,energy_func)
-    oriented_dependent_Hbond_force.addPerBondParameter("epsilon")
-    oriented_dependent_Hbond_force.addPerBondParameter("sigma")
-    for row in odHbond_info.itertuples():
-        oriented_dependent_Hbond_force.addBond([row.a1, row.a2, row.a3, row.a4, row.a5, row.a6,row.a7,row.a8], [row.epsilon, row.sigma])
-    oriented_dependent_Hbond_force.setUsesPeriodicBoundaryConditions(use_pbc)
-    oriented_dependent_Hbond_force.setForceGroup(force_group)
-    return oriented_dependent_Hbond_force
-
 def go_contact_term(native_contact_info, use_pbc=False, cutoff=2.5, force_group=1):
     """a typical  Lenard-Jones(12-10) potential for native contact in go model
 
